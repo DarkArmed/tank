@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Game } from "../sim";
-import { createGame } from "../sim";
+import { createGame, publishedStageMaps } from "../sim";
 import { AppMachine } from "./AppMachine";
 
-const factory = (players: 1 | 2): Game => createGame({ playerCount: players, maps: [], seed: 1 });
+const factory = (players: 1 | 2): Game => createGame({ playerCount: players, maps: publishedStageMaps, seed: 1 });
 
 describe("AppMachine menus", () => {
   it("wraps through all TANK A-N choices", () => {

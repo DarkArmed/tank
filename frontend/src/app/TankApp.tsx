@@ -5,7 +5,7 @@ import { InputManager } from "./input/InputManager";
 import type { InputFrame } from "./input/types";
 import { FixedStepLoop } from "./loop/FixedStepLoop";
 import { configureCanvas, renderApp, resizeCanvas } from "./renderer/CanvasRenderer";
-import { createGame, type GameInput, type PlayerInput } from "./sim";
+import { createGame, publishedStageMaps, type GameInput, type PlayerInput } from "./sim";
 import { AppMachine } from "./state/AppMachine";
 
 export function TankApp() {
@@ -67,6 +67,11 @@ export function TankApp() {
               );
               firstTick = false;
               audio.consume(result.events);
+              if (result.events.some((event) => event.type === "gameOver" || event.type === "completed")) {
+                machine.returnToTankSelect();
+                input.clear();
+                loop.reset(now);
+              }
             });
           }
         } else if (machine.scene.type === "paused") {
@@ -139,7 +144,7 @@ function handleMenu(
   if (!input.menu.confirmPressed) return;
   const result = machine.confirm(input.connectedGamepads, (playerCount) => createGame({
     playerCount,
-    maps: [],
+    maps: publishedStageMaps,
     seed: createSeed(),
   }));
   if (result === "start") {

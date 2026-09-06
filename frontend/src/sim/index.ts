@@ -1,5 +1,10 @@
 import { Simulation } from "./game";
-import type { CreateGameOptions, Game } from "./types";
+import stage1 from "./maps/stage-1.json";
+import stage2 from "./maps/stage-2.json";
+import stage3 from "./maps/stage-3.json";
+import type { CreateGameOptions, Game, StageMap } from "./types";
+
+export const publishedStageMaps = [stage1, stage2, stage3] as unknown as readonly StageMap[];
 
 export type {
   BulletSnapshot,
