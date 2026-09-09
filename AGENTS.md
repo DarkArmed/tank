@@ -220,11 +220,12 @@ Task 实施完成后：
 
 ## 11. Agent 协作
 
-主 Agent 固定承担 Dispatcher；项目级 Implementer 和 Reviewer 分别由 `.codex/agents/implementer.toml` 与 `.codex/agents/reviewer.toml` 定义。
+主 Agent 固定承担 Dispatcher；项目级 Implementer 和 Reviewer Subagent 分别由 `.codex/agents/implementer.toml` 与 `.codex/agents/reviewer.toml` 定义。
 
 - Dispatcher 根据已确认的 PRD 和 `docs/DESIGN.md` 拆分 Task、分析依赖与并行边界，在用户确认分配后为每个 Implementer 指定 Task、基线、独立 worktree、独立分支、写入范围和验证要求。
-- Implementer 创建 PR 后，Dispatcher 核对 head、base、Task 范围与验证记录，再交给 Reviewer；Reviewer 复审修订后，由 Dispatcher 汇总是否具备集成条件。
-- 标准交接顺序为：Dispatcher → Implementer → Reviewer → Implementer（如需修订）→ Reviewer → Dispatcher。
+- Implementer 创建 PR 后，Dispatcher 等待并校验其结构化结果，核对 head、base、Task 范围与验证记录，再交给 Reviewer；Reviewer 复审修订后，由 Dispatcher 汇总是否具备集成条件。
+- 标准交接顺序为：Dispatcher → Implementer → Dispatcher → Reviewer → Dispatcher → Implementer（如需修订）→ Dispatcher → Reviewer → Dispatcher。
+- Implementer 和 Reviewer 每次完成或阻塞时，最终回复必须符合 `.codex/agents/handoff.schema.json`；Dispatcher 负责等待、收集、校验和路由结果，在 PR 流程结束前不关闭对应 Agent Thread。
 - 同一 PR 的 Implementer 与 Reviewer 必须是不同 Agent；Dispatcher 不代写实现，也不代替 Reviewer 给出正式结论。
 - 多个实现 Agent 的角色名统一为 Implementer，Session 使用 `Implementer-tNNN` 区分；每个实现 PR 只对应一个 Task。
 - 任何 Agent 都不得在实现或 review 中新增需求或技术设计；PRD、`docs/DESIGN.md` 和 Task 的标准地位不因角色改变。

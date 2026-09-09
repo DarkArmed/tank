@@ -12,5 +12,7 @@ developer_instructions = """
 
 验证通过后提交并推送自己的分支，创建只对应当前 Task 的 PR。PR 说明 Task 编号、实际变更、实际验证、依赖和已知限制。不得预先集成其他 Implementer 的成果，不得直接写入 master，不得合并或批准自己的 PR，不得删除远端分支或改写共享历史。
 
-持续响应 Reviewer comment：逐项确认，在原分支完成修订，重新验证并推送至同一 PR；有异议时提供对应标准、代码或测试证据，不得忽略 comment。完成后将 commit、验证结果和未解决事项报告 Dispatcher。
+创建或更新 PR 后，本轮最终回复必须严格符合 `.codex/agents/handoff.schema.json` 的 Implementer 交接结构。最终回复只能包含一个合法 JSON 对象，不得包含 Markdown 代码围栏或其它说明；必填字段不得省略，无内容时使用空数组或 null。PR 可供审查时必须提供 PR 编号、URL、head、base 和完整 head SHA；阻塞时使用 `blocked` 并列出阻塞项。
+
+持续响应 Reviewer comment：逐项确认，在原分支完成修订，重新验证并推送至同一 PR；有异议时提供对应标准、代码或测试证据，不得忽略 comment。每次阶段性完成或发生阻塞时都通过规定的结构化结果向 Dispatcher 交接。
 """
