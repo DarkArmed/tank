@@ -1,11 +1,12 @@
 import { useEffect, useRef } from "react";
 import { PixelAudio } from "./audio/PixelAudio";
 import { startPressedForPlayers } from "./input/activePlayers";
+import { GameInputLatch } from "./input/GameInputLatch";
 import { InputManager } from "./input/InputManager";
 import type { InputFrame } from "./input/types";
 import { FixedStepLoop } from "./loop/FixedStepLoop";
 import { configureCanvas, renderApp, resizeCanvas } from "./renderer/CanvasRenderer";
-import { createGame, type GameInput, type PlayerInput } from "./sim";
+import { createGame } from "./sim";
 import { AppMachine } from "./state/AppMachine";
 
 export function TankApp() {
@@ -17,6 +18,7 @@ export function TankApp() {
     const context = configureCanvas(canvas);
     const machine = new AppMachine();
     const input = new InputManager();
+    const gameInput = new GameInputLatch();
     const loop = new FixedStepLoop();
     const audio = new PixelAudio();
     const activeControllerSlots = new Set<number>();
@@ -30,6 +32,7 @@ export function TankApp() {
     const pauseForBlur = (): void => {
       if (machine.pause("blur")) audio.playUi("pause");
       input.clear();
+      gameInput.clear();
       loop.reset();
       renderApp(context, machine.scene);
     };
@@ -41,6 +44,7 @@ export function TankApp() {
       const sceneAtStart = machine.scene;
 
       if (sceneAtStart.type === "tankSelect" || sceneAtStart.type === "playerSelect") {
+        gameInput.clear();
         handleMenu(machine, currentInput, audio, activeControllerSlots);
         loop.advance(now, true, () => undefined);
       } else {
@@ -51,21 +55,20 @@ export function TankApp() {
         if (controllerLost) {
           machine.pause("controllerDisconnected");
           input.clear();
+          gameInput.clear();
         }
 
         if (machine.scene.type === "game") {
           if (startPressedForPlayers(currentInput, machine.scene.playerCount)) {
             machine.pause("manual");
             input.clear();
+            gameInput.clear();
             audio.playUi("pause");
           } else {
-            let firstTick = true;
+            gameInput.capture(currentInput.game);
             loop.advance(now, false, () => {
               if (machine.scene.type !== "game") return;
-              const result = machine.scene.game.tick(
-                firstTick ? currentInput.game : withoutPressedEdges(currentInput.game),
-              );
-              firstTick = false;
+              const result = machine.scene.game.tick(gameInput.consumeTick());
               audio.consume(result.events);
             });
           }
@@ -77,6 +80,7 @@ export function TankApp() {
           ) {
             machine.resume(true);
             input.clear();
+            gameInput.clear();
             loop.reset(now);
             audio.playUi("confirm");
           }
@@ -106,6 +110,7 @@ export function TankApp() {
       window.removeEventListener("resize", resize);
       audio.close();
       input.clear();
+      gameInput.clear();
     };
   }, []);
 
@@ -164,21 +169,6 @@ function handleMenu(
 
 function controllersReady(input: InputFrame, activeSlots: ReadonlySet<number>): boolean {
   return [...activeSlots].every((slot) => input.assignedSlots[slot] === true);
-}
-
-function withoutPressedEdges(input: GameInput): GameInput {
-  return {
-    player1: withoutPlayerEdges(input.player1),
-    player2: withoutPlayerEdges(input.player2),
-  };
-}
-
-function withoutPlayerEdges(input: PlayerInput): PlayerInput {
-  return {
-    ...input,
-    fireSinglePressed: false,
-    borrowLifePressed: false,
-  };
 }
 
 function readGamepads(): readonly (Gamepad | null)[] {
