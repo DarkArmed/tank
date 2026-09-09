@@ -420,6 +420,21 @@ describe("BI-09 through BI-21 entity interactions", () => {
     expect(events.filter((event) => event.type === "impact" && event.target === "bullet")).toHaveLength(2);
   });
 
+  it("BI-15 ignores a later collision when one bullet already disappeared in an earlier collision", () => {
+    const game = newGame();
+    const state = access(game);
+    state.tanks = [];
+    state.bullets = [
+      bullet({ id: 20, team: "player", ownerId: 1, x: 69.5, y: 80, direction: "right", speedPerTick: 3 }),
+      bullet({ id: 21, team: "enemy", ownerId: 2, x: 74, y: 80, direction: "right", speedPerTick: 2 }),
+      bullet({ id: 22, team: "player", ownerId: 3, x: 82, y: 80, direction: "left", speedPerTick: 3 }),
+    ];
+    const events: SimulationEvent[] = [];
+    state.advanceBullets(events);
+    expect(state.bullets).toMatchObject([{ id: 22, x: 79, y: 80 }]);
+    expect(events.filter((event) => event.type === "impact" && event.target === "bullet")).toHaveLength(2);
+  });
+
   it("BI-15 does not collide separated bullets merely because their tick paths overlap at different times", () => {
     const game = newGame();
     const state = access(game);

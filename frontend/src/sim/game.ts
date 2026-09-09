@@ -99,6 +99,12 @@ interface BulletPath {
   grass: readonly TimedTilePoint[];
 }
 
+interface BulletPairCollision {
+  firstId: number;
+  secondId: number;
+  time: number;
+}
+
 type BulletCollision =
   | { type: "boundary" }
   | { type: "terrain"; tile: "brick" | "steel"; column: number; row: number }
@@ -614,18 +620,36 @@ export class Simulation implements Game {
 
   private advanceBullets(events: SimulationEvent[]): void {
     const paths = [...this.bullets].sort((a, b) => a.id - b.id).map((bullet) => this.traceBullet(bullet));
-    const collidedBullets = new Set<number>();
-    const bulletCollisionTimes = new Map<number, number>();
+    const bulletPairCollisions: BulletPairCollision[] = [];
     for (let first = 0; first < paths.length; first += 1) {
       for (let second = first + 1; second < paths.length; second += 1) {
-        const collisionTime = this.bulletCollisionTime(paths[first], paths[second]);
-        if (collisionTime === null) continue;
-        const firstId = paths[first].bullet.id;
-        const secondId = paths[second].bullet.id;
-        collidedBullets.add(firstId);
-        collidedBullets.add(secondId);
-        bulletCollisionTimes.set(firstId, Math.min(bulletCollisionTimes.get(firstId) ?? 1, collisionTime));
-        bulletCollisionTimes.set(secondId, Math.min(bulletCollisionTimes.get(secondId) ?? 1, collisionTime));
+        const time = this.bulletCollisionTime(paths[first], paths[second]);
+        if (time !== null) bulletPairCollisions.push({ firstId: paths[first].bullet.id, secondId: paths[second].bullet.id, time });
+      }
+    }
+    bulletPairCollisions.sort((first, second) => first.time - second.time || first.firstId - second.firstId || first.secondId - second.secondId);
+
+    const collidedBullets = new Set<number>();
+    const bulletCollisionTimes = new Map<number, number>();
+    const activeBullets = new Set(paths.map((path) => path.bullet.id));
+    for (let index = 0; index < bulletPairCollisions.length;) {
+      const collisionTime = bulletPairCollisions[index].time;
+      const collidedAtTime = new Set<number>();
+      while (
+        index < bulletPairCollisions.length
+        && Math.abs(bulletPairCollisions[index].time - collisionTime) <= Number.EPSILON * 16
+      ) {
+        const collision = bulletPairCollisions[index];
+        if (activeBullets.has(collision.firstId) && activeBullets.has(collision.secondId)) {
+          collidedAtTime.add(collision.firstId);
+          collidedAtTime.add(collision.secondId);
+        }
+        index += 1;
+      }
+      for (const bulletId of collidedAtTime) {
+        activeBullets.delete(bulletId);
+        collidedBullets.add(bulletId);
+        bulletCollisionTimes.set(bulletId, collisionTime);
       }
     }
 
