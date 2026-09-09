@@ -340,13 +340,79 @@ describe("BI-09 through BI-21 entity interactions", () => {
     expect(state.item).toEqual({ kind: "star", column: 5, row: 10 });
   });
 
-  it("BI-15 removes both bullets for every team pairing", () => {
+  it("BI-06 keeps grass destruction that occurs before a bullet collision", () => {
+    const game = newGame();
+    const state = access(game);
+    state.tanks = [];
+    state.terrain[10][10] = "grass";
+    state.bullets = [
+      bullet({ id: 20, team: "player", ownerId: 1, x: 77, y: 82, direction: "right", speedPerTick: 3, canBreakGrass: true }),
+      bullet({ id: 21, team: "enemy", ownerId: 2, x: 84, y: 82, direction: "left", speedPerTick: 2 }),
+    ];
+    state.advanceBullets([]);
+    expect(state.terrain[10][10]).toBe("empty");
+    expect(state.bullets).toHaveLength(0);
+  });
+
+  const bulletCollisionCases = [
+    {
+      path: "head-on",
+      first: { team: "player", x: 78, y: 80, direction: "right", speedPerTick: 2 },
+      second: { team: "enemy", x: 82, y: 80, direction: "left", speedPerTick: 2 },
+    },
+    {
+      path: "head-on",
+      first: { team: "player", x: 78, y: 80, direction: "right", speedPerTick: 2 },
+      second: { team: "player", x: 82, y: 80, direction: "left", speedPerTick: 2 },
+    },
+    {
+      path: "head-on",
+      first: { team: "enemy", x: 78, y: 80, direction: "right", speedPerTick: 2 },
+      second: { team: "enemy", x: 82, y: 80, direction: "left", speedPerTick: 2 },
+    },
+    {
+      path: "rear-end",
+      first: { team: "player", x: 76, y: 80, direction: "right", speedPerTick: 3 },
+      second: { team: "enemy", x: 80, y: 80, direction: "right", speedPerTick: 2 },
+    },
+    {
+      path: "rear-end",
+      first: { team: "player", x: 76, y: 80, direction: "right", speedPerTick: 3 },
+      second: { team: "player", x: 80, y: 80, direction: "right", speedPerTick: 2 },
+    },
+    {
+      path: "rear-end",
+      first: { team: "enemy", x: 76, y: 80, direction: "right", speedPerTick: 3 },
+      second: { team: "enemy", x: 80, y: 80, direction: "right", speedPerTick: 2 },
+    },
+    {
+      path: "perpendicular",
+      first: { team: "player", x: 74, y: 80, direction: "right", speedPerTick: 3 },
+      second: { team: "enemy", x: 80, y: 74, direction: "down", speedPerTick: 3 },
+    },
+    {
+      path: "perpendicular",
+      first: { team: "player", x: 74, y: 80, direction: "right", speedPerTick: 3 },
+      second: { team: "player", x: 80, y: 74, direction: "down", speedPerTick: 3 },
+    },
+    {
+      path: "perpendicular",
+      first: { team: "enemy", x: 74, y: 80, direction: "right", speedPerTick: 3 },
+      second: { team: "enemy", x: 80, y: 74, direction: "down", speedPerTick: 3 },
+    },
+  ] satisfies readonly {
+    path: string;
+    first: Pick<TestBullet, "team" | "x" | "y" | "direction" | "speedPerTick">;
+    second: Pick<TestBullet, "team" | "x" | "y" | "direction" | "speedPerTick">;
+  }[];
+
+  it.each(bulletCollisionCases)("BI-15 removes both bullets for $path $first.team/$second.team collisions", ({ first, second }) => {
     const game = newGame();
     const state = access(game);
     state.tanks = [];
     state.bullets = [
-      bullet({ id: 20, team: "player", ownerId: 1, x: 78, y: 80, direction: "right" }),
-      bullet({ id: 21, team: "enemy", ownerId: 2, x: 82, y: 80, direction: "left" }),
+      bullet({ id: 20, ownerId: 1, ...first }),
+      bullet({ id: 21, ownerId: 2, ...second }),
     ];
     const events: SimulationEvent[] = [];
     state.advanceBullets(events);

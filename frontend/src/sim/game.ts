@@ -92,12 +92,11 @@ interface Rect {
 
 interface BulletPath {
   bullet: BulletState;
-  positions: readonly Rect[];
   duration: number;
   endX: number;
   endY: number;
   collision: BulletCollision | null;
-  grass: readonly TilePoint[];
+  grass: readonly TimedTilePoint[];
 }
 
 type BulletCollision =
@@ -109,6 +108,10 @@ type BulletCollision =
 interface TilePoint {
   column: number;
   row: number;
+}
+
+interface TimedTilePoint extends TilePoint {
+  time: number;
 }
 
 function directionVector(direction: Direction): readonly [number, number] {
@@ -612,12 +615,17 @@ export class Simulation implements Game {
   private advanceBullets(events: SimulationEvent[]): void {
     const paths = [...this.bullets].sort((a, b) => a.id - b.id).map((bullet) => this.traceBullet(bullet));
     const collidedBullets = new Set<number>();
+    const bulletCollisionTimes = new Map<number, number>();
     for (let first = 0; first < paths.length; first += 1) {
       for (let second = first + 1; second < paths.length; second += 1) {
-        if (this.pathsOverlap(paths[first], paths[second])) {
-          collidedBullets.add(paths[first].bullet.id);
-          collidedBullets.add(paths[second].bullet.id);
-        }
+        const collisionTime = this.bulletCollisionTime(paths[first], paths[second]);
+        if (collisionTime === null) continue;
+        const firstId = paths[first].bullet.id;
+        const secondId = paths[second].bullet.id;
+        collidedBullets.add(firstId);
+        collidedBullets.add(secondId);
+        bulletCollisionTimes.set(firstId, Math.min(bulletCollisionTimes.get(firstId) ?? 1, collisionTime));
+        bulletCollisionTimes.set(secondId, Math.min(bulletCollisionTimes.get(secondId) ?? 1, collisionTime));
       }
     }
 
@@ -626,10 +634,17 @@ export class Simulation implements Game {
     let hqHit = false;
     for (const path of paths) {
       const bullet = path.bullet;
-      if (collidedBullets.has(bullet.id)) continue;
+      const bulletCollisionTime = bulletCollisionTimes.get(bullet.id);
       for (const point of path.grass) {
-        if (bullet.canBreakGrass && this.terrain[point.row][point.column] === "grass") this.terrain[point.row][point.column] = "empty";
+        if (
+          bullet.canBreakGrass
+          && (bulletCollisionTime === undefined || point.time <= bulletCollisionTime)
+          && this.terrain[point.row][point.column] === "grass"
+        ) {
+          this.terrain[point.row][point.column] = "empty";
+        }
       }
+      if (collidedBullets.has(bullet.id)) continue;
       if (!path.collision) {
         bullet.x = path.endX;
         bullet.y = path.endY;
@@ -677,14 +692,14 @@ export class Simulation implements Game {
     const step = bullet.speedPerTick / steps;
     let x = bullet.x;
     let y = bullet.y;
-    const positions: Rect[] = [{ x, y, width: CONFIG.bulletPixels, height: CONFIG.bulletPixels }];
-    const grass = new Map<string, TilePoint>();
+    let completedSteps = 0;
+    const grass = new Map<string, TimedTilePoint>();
     let collision: BulletCollision | null = null;
     for (let index = 0; index < steps; index += 1) {
       x += dx * step;
       y += dy * step;
+      completedSteps += 1;
       const rect = { x, y, width: CONFIG.bulletPixels, height: CONFIG.bulletPixels };
-      positions.push(rect);
       if (this.bulletReachedBoundary(bullet.direction, x, y)) {
         collision = { type: "boundary" };
         break;
@@ -693,8 +708,10 @@ export class Simulation implements Game {
       const grassPoint = {
         column: Math.floor((x + CONFIG.bulletPixels / 2) / CONFIG.halfTilePixels),
         row: Math.floor((y + CONFIG.bulletPixels / 2) / CONFIG.halfTilePixels),
+        time: completedSteps / steps,
       };
-      if (this.terrain[grassPoint.row]?.[grassPoint.column] === "grass") grass.set(pointKey(grassPoint), grassPoint);
+      const grassKey = pointKey(grassPoint);
+      if (this.terrain[grassPoint.row]?.[grassPoint.column] === "grass" && !grass.has(grassKey)) grass.set(grassKey, grassPoint);
       const solid = points.find((point) => {
         const tile = this.terrain[point.row][point.column];
         return tile === "brick" || tile === "steel" || tile === "hq";
@@ -711,17 +728,44 @@ export class Simulation implements Game {
         break;
       }
     }
-    return { bullet, positions, duration: (positions.length - 1) / steps, endX: x, endY: y, collision, grass: [...grass.values()] };
+    return { bullet, duration: completedSteps / steps, endX: x, endY: y, collision, grass: [...grass.values()] };
   }
 
-  private pathsOverlap(first: BulletPath, second: BulletPath): boolean {
-    const samples = 6;
-    for (let sample = 0; sample <= samples; sample += 1) {
-      const time = sample / samples;
-      if (time > first.duration || time > second.duration) continue;
-      if (overlaps(this.bulletRectAt(first.bullet, time), this.bulletRectAt(second.bullet, time))) return true;
+  private bulletCollisionTime(first: BulletPath, second: BulletPath): number | null {
+    const firstRect = this.bulletRectAt(first.bullet, 0);
+    const secondRect = this.bulletRectAt(second.bullet, 0);
+    if (overlaps(firstRect, secondRect)) return 0;
+
+    const [firstDx, firstDy] = directionVector(first.bullet.direction);
+    const [secondDx, secondDy] = directionVector(second.bullet.direction);
+    const xInterval = this.axisOverlapInterval(
+      firstRect.x,
+      secondRect.x,
+      firstRect.width,
+      firstDx * first.bullet.speedPerTick - secondDx * second.bullet.speedPerTick,
+    );
+    const yInterval = this.axisOverlapInterval(
+      firstRect.y,
+      secondRect.y,
+      firstRect.height,
+      firstDy * first.bullet.speedPerTick - secondDy * second.bullet.speedPerTick,
+    );
+    if (!xInterval || !yInterval) return null;
+
+    const start = Math.max(0, xInterval[0], yInterval[0]);
+    const end = Math.min(first.duration, second.duration, xInterval[1], yInterval[1]);
+    return start < end ? start : null;
+  }
+
+  private axisOverlapInterval(first: number, second: number, size: number, relativeSpeed: number): readonly [number, number] | null {
+    if (relativeSpeed === 0) {
+      return first < second + size && first + size > second
+        ? [Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY]
+        : null;
     }
-    return false;
+    const firstContact = (second - first - size) / relativeSpeed;
+    const lastContact = (second + size - first) / relativeSpeed;
+    return [Math.min(firstContact, lastContact), Math.max(firstContact, lastContact)];
   }
 
   private bulletReachedBoundary(direction: Direction, x: number, y: number): boolean {
