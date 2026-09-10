@@ -1,4 +1,4 @@
-import type { Game } from "../sim";
+import type { Game, SimulationEvent } from "../sim";
 
 export const TANK_LETTERS = [
   "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N",
@@ -96,6 +96,14 @@ export class AppMachine {
     if (this.scene.type !== "paused" || !controllersReady) return false;
     const { tank, playerCount, game } = this.scene;
     this.scene = { type: "game", tank, playerCount, game };
+    return true;
+  }
+
+  consumeSimulationEvents(events: readonly SimulationEvent[]): boolean {
+    if (this.scene.type !== "game") return false;
+    const terminal = events.some(({ type }) => type === "gameOver" || type === "completed");
+    if (!terminal) return false;
+    this.returnToTankSelect();
     return true;
   }
 

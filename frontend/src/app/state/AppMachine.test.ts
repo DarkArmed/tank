@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Game } from "../sim";
-import { createGame } from "../sim";
+import { createGame, STAGE_MAPS } from "../sim";
 import { AppMachine } from "./AppMachine";
 
-const factory = (players: 1 | 2): Game => createGame({ playerCount: players, maps: [], seed: 1 });
+const factory = (players: 1 | 2): Game => createGame({ playerCount: players, maps: STAGE_MAPS, seed: 1 });
 
 describe("AppMachine menus", () => {
   it("wraps through all TANK A-N choices", () => {
@@ -57,4 +57,18 @@ describe("AppMachine menus", () => {
       expect(machine.scene.reason).toBe("controllerDisconnected");
     }
   });
+
+  it.each(["gameOver", "completed"] as const)(
+    "returns to tank select only when the %s completion event arrives",
+    (type) => {
+      const machine = new AppMachine();
+      machine.confirm(0, factory);
+      machine.confirm(0, factory);
+
+      expect(machine.consumeSimulationEvents([{ type: "stageClear", stage: 1 }])).toBe(false);
+      expect(machine.scene.type).toBe("game");
+      expect(machine.consumeSimulationEvents([{ type }])).toBe(true);
+      expect(machine.scene).toEqual({ type: "tankSelect", selected: "A" });
+    },
+  );
 });
