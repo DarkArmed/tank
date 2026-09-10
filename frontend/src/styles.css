@@ -1,0 +1,47 @@
+:root {
+  color-scheme: dark;
+  font-family: monospace;
+  background: #0c0b12;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 256px;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+  overflow: auto;
+  background: radial-gradient(circle at center, #242030 0, #0c0b12 68%);
+}
+
+#root {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+}
+
+.game-shell {
+  display: grid;
+  place-items: center;
+  min-width: 256px;
+  min-height: 240px;
+  outline: none;
+}
+
+.game-canvas {
+  display: block;
+  width: 256px;
+  height: 240px;
+  background: #0b0a0f;
+  image-rendering: pixelated;
+  box-shadow: 0 0 0 2px #3e3a49, 0 12px 36px #000b;
+}
