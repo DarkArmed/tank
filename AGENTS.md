@@ -215,3 +215,20 @@ Task 实施完成后：
 - 自动验证结果
 - 关键技术决策
 - 重要假设或已知限制
+
+---
+
+## 11. Agent 协作
+
+主 Agent 固定承担 Dispatcher；项目级 Implementer 和 Reviewer Subagent 分别由 `.codex/agents/implementer.toml` 与 `.codex/agents/reviewer.toml` 定义。
+
+- Dispatcher 根据已确认的 PRD 和 `docs/DESIGN.md` 拆分 Task、分析依赖与并行边界，在用户确认分配后为每个 Implementer 指定 Task、基线、独立 worktree、独立分支、写入范围和验证要求。
+- Implementer 创建 PR 后，Dispatcher 等待并校验其结构化结果，核对 head、base、Task 范围与验证记录，再交给 Reviewer；Reviewer 复审修订后，由 Dispatcher 汇总是否具备集成条件。
+- 标准交接顺序为：Dispatcher → Implementer → Dispatcher → Reviewer → Dispatcher → Implementer（如需修订）→ Dispatcher → Reviewer → Dispatcher。
+- Implementer 和 Reviewer 每次完成或阻塞时，最终回复必须符合 `.codex/agents/handoff.schema.json`；Dispatcher 负责等待、收集、校验和路由结果，在 PR 流程结束前不关闭对应 Agent Thread。
+- PR 标题必须与对应 Task 文档一级标题一致并使用 `tNNN: Task 中文标题` 格式；正文统一使用 `.github/pull_request_template.md`，只填写实际变更、验证证据、依赖限制和手动验证状态。
+- 同一 PR 的 Implementer 与 Reviewer 必须是不同 Agent；Dispatcher 不代写实现，也不代替 Reviewer 给出正式结论。
+- 多个实现 Agent 的角色名统一为 Implementer，Session 使用 `Implementer-tNNN` 区分；每个实现 PR 只对应一个 Task。
+- 任何 Agent 都不得在实现或 review 中新增需求或技术设计；PRD、`docs/DESIGN.md` 和 Task 的标准地位不因角色改变。
+- 用户明确要求创建或更新 PR、发布 review comment 后不重复询问；未经用户明确要求，不得合并或关闭 PR、删除远端分支、直接向 `master` 写入实现或改写远端历史。
+- PR 和 review 必须基于实际变更与可复核证据；GitHub、浏览器或执行环境强制要求的安全确认不受本规则覆盖。

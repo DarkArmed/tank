@@ -1,0 +1,414 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/DarkArmed/tank/blob/master/.codex/agents/handoff.schema.json",
+  "title": "Tank agent handoff",
+  "description": "Structured final result returned by an Implementer or Reviewer subagent to the Dispatcher.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/implementerHandoff"
+    },
+    {
+      "$ref": "#/$defs/reviewerHandoff"
+    }
+  ],
+  "$defs": {
+    "pullRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "number",
+        "url",
+        "base",
+        "head",
+        "head_sha"
+      ],
+      "properties": {
+        "number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "base": {
+          "type": "string",
+          "minLength": 1
+        },
+        "head": {
+          "type": "string",
+          "minLength": 1
+        },
+        "head_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command",
+        "result",
+        "details"
+      ],
+      "properties": {
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "type": "string",
+          "enum": [
+            "passed",
+            "failed",
+            "not_run"
+          ]
+        },
+        "details": {
+          "type": "string"
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "severity",
+        "comment_url",
+        "summary",
+        "file",
+        "line"
+      ],
+      "properties": {
+        "severity": {
+          "type": "string",
+          "enum": [
+            "blocking",
+            "non_blocking"
+          ]
+        },
+        "comment_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "file": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "line": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        }
+      }
+    },
+    "implementerHandoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "role",
+        "task_id",
+        "status",
+        "summary",
+        "pr",
+        "changes",
+        "verification",
+        "known_limitations",
+        "blockers",
+        "next_action"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "role": {
+          "const": "implementer"
+        },
+        "task_id": {
+          "type": "string",
+          "pattern": "^t[0-9]{3}$"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pr_ready",
+            "revision_ready",
+            "blocked"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pr": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/pullRequest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "changes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "verification": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/verification"
+          }
+        },
+        "known_limitations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "next_action": {
+          "type": "string",
+          "enum": [
+            "dispatch_reviewer",
+            "needs_dispatcher_decision"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "blocked"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "next_action": {
+                "const": "needs_dispatcher_decision"
+              },
+              "blockers": {
+                "minItems": 1
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "pr": {
+                "$ref": "#/$defs/pullRequest"
+              },
+              "next_action": {
+                "const": "dispatch_reviewer"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "reviewerHandoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "role",
+        "task_id",
+        "status",
+        "summary",
+        "pr",
+        "review_url",
+        "findings",
+        "verification",
+        "remaining_risks",
+        "blockers",
+        "next_action"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "1.0"
+        },
+        "role": {
+          "const": "reviewer"
+        },
+        "task_id": {
+          "type": "string",
+          "pattern": "^t[0-9]{3}$"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "changes_requested",
+            "no_blockers",
+            "blocked"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pr": {
+          "$ref": "#/$defs/pullRequest"
+        },
+        "review_url": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "uri"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/finding"
+          }
+        },
+        "verification": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/verification"
+          }
+        },
+        "remaining_risks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "blockers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "next_action": {
+          "type": "string",
+          "enum": [
+            "return_to_implementer",
+            "ready_for_integration",
+            "needs_dispatcher_decision"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "changes_requested"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "findings": {
+                "contains": {
+                  "properties": {
+                    "severity": {
+                      "const": "blocking"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                },
+                "minContains": 1
+              },
+              "next_action": {
+                "const": "return_to_implementer"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "no_blockers"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "findings": {
+                "not": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "const": "blocking"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                }
+              },
+              "next_action": {
+                "const": "ready_for_integration"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "blocked"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "blockers": {
+                "minItems": 1
+              },
+              "next_action": {
+                "const": "needs_dispatcher_decision"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
